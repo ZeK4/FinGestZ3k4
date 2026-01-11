@@ -2,13 +2,20 @@
 import { Transaction, Investment, InvestmentAction } from '../types';
 import * as XLSX from 'xlsx';
 
-// Normalizar strings para comparação de cabeçalhos
-const normalizeHeader = (h: string) => h.toLowerCase().trim().replace(/\s+/g, ' ');
+// Definição dos cabeçalhos padrão para consistência na exportação/importação (CamelCase)
+const TRANSACTION_HEADERS = ['id', 'date', 'description', 'amount', 'type', 'category'];
+const INVESTMENT_HEADERS = ['id', 'name', 'ticker', 'isin', 'type', 'date', 'pricePerShare', 'investedValue', 'shares', 'notes'];
+
+// Palavras-chave que indicam estrutura de investimentos
+const INV_KEYWORDS = ['ticker', 'isin', 'shares', 'price / share', 'no. of shares', 'action'];
 
 // --- TRANSAÇÕES ---
 
 export const exportTransactionsToCSV = (transactions: Transaction[]) => {
-  const ws = XLSX.utils.json_to_sheet(transactions);
+  const ws = transactions.length > 0 
+    ? XLSX.utils.json_to_sheet(transactions, { header: TRANSACTION_HEADERS })
+    : XLSX.utils.aoa_to_sheet([TRANSACTION_HEADERS]);
+
   const csv = XLSX.utils.sheet_to_csv(ws);
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement("a");
@@ -18,7 +25,10 @@ export const exportTransactionsToCSV = (transactions: Transaction[]) => {
 };
 
 export const exportTransactionsToExcel = (transactions: Transaction[]) => {
-  const ws = XLSX.utils.json_to_sheet(transactions);
+  const ws = transactions.length > 0 
+    ? XLSX.utils.json_to_sheet(transactions, { header: TRANSACTION_HEADERS })
+    : XLSX.utils.aoa_to_sheet([TRANSACTION_HEADERS]);
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Extrato");
   XLSX.writeFile(wb, "extrato_fingestor.xlsx");
@@ -27,16 +37,25 @@ export const exportTransactionsToExcel = (transactions: Transaction[]) => {
 export const parseFile = async (file: File): Promise<Transaction[]> => {
   const data = await file.arrayBuffer();
   const workbook = XLSX.read(data);
-  const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]) as any[];
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const jsonData = XLSX.utils.sheet_to_json(sheet) as any[];
   
-  // Mapeamento simplificado para transações bancárias
+  if (jsonData.length > 0) {
+    const headers = Object.keys(jsonData[0]).map(h => h.toLowerCase());
+    const isInvestment = headers.some(h => INV_KEYWORDS.includes(h));
+    
+    if (isInvestment) {
+      throw new Error("errorInvestmentFileInDash");
+    }
+  }
+
   return jsonData.map(row => ({
-    id: Date.now().toString() + Math.random().toString().slice(2, 8),
-    date: row['Data do movimento'] || new Date().toISOString().split('T')[0],
-    description: row['Descrição'] || 'Sem descrição',
-    amount: Math.abs(parseFloat(row['Debito'] || row['Credito'] || 0)),
-    type: row['Credito'] ? 'income' : 'expense',
-    category: row['Categoria'] || 'Outros'
+    id: String(row['id'] || Date.now().toString() + Math.random().toString().slice(2, 8)),
+    date: row['date'] || row['Data do movimento'] || new Date().toISOString().split('T')[0],
+    description: row['description'] || row['Descrição'] || 'Sem descrição',
+    amount: Math.abs(parseFloat(String(row['amount'] || row['Debito'] || row['Credito'] || 0).replace(',', '.'))),
+    type: (row['type'] || (row['Credito'] ? 'income' : 'expense')) as any,
+    category: row['category'] || row['Categoria'] || 'Outros'
   }));
 };
 
@@ -45,44 +64,55 @@ export const parseFile = async (file: File): Promise<Transaction[]> => {
 export const parseInvestmentsFile = async (file: File): Promise<Investment[]> => {
   const data = await file.arrayBuffer();
   const workbook = XLSX.read(data);
-  const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: "" }) as any[];
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: "" }) as any[];
 
   if (jsonData.length === 0) throw new Error("Ficheiro vazio.");
 
-  // Mapeamento baseado na imagem fornecida (Trading 212 Style)
+  // Validação: Se não tiver ticker ou ISIN ou Price mas tiver categoria/descrição, provavelmente é transação
+  const headers = Object.keys(jsonData[0]).map(h => h.toLowerCase());
+  const hasInvHeaders = headers.some(h => INV_KEYWORDS.includes(h));
+  const hasTransHeaders = headers.includes('categoria') || headers.includes('descrição') || headers.includes('category');
+
+  if (!hasInvHeaders && hasTransHeaders) {
+    throw new Error("errorTransactionFileInInv");
+  }
+
   return jsonData.map(row => {
-    const action = (row['Action'] || row['action'] || 'Market buy') as InvestmentAction;
+    const action = (row['type'] || row['Action'] || row['action'] || 'Market buy') as InvestmentAction;
     
-    // Tratamento de datas (pode vir como string ou número de série do excel)
-    let dateStr = row['Time'] || row['time'] || new Date().toISOString();
+    let dateStr = row['date'] || row['Time'] || row['time'] || new Date().toISOString();
     if (typeof dateStr === 'number') {
       const d = new Date((dateStr - 25569) * 86400 * 1000);
       dateStr = d.toISOString().split('T')[0];
     } else {
-      dateStr = dateStr.split(' ')[0]; // Pega apenas a data se houver hora
+      dateStr = String(dateStr).split(' ')[0];
     }
 
-    const price = parseFloat(String(row['Price / share'] || 0).replace(',', '.'));
-    const total = parseFloat(String(row['Total'] || row['total'] || 0).replace(',', '.'));
-    const shares = parseFloat(String(row['No. of shares'] || 0).replace(',', '.'));
+    const price = parseFloat(String(row['pricePerShare'] || row['Price / share'] || row['price'] || 0).replace(',', '.'));
+    const total = parseFloat(String(row['investedValue'] || row['Total'] || row['total'] || 0).replace(',', '.'));
+    const sharesCount = parseFloat(String(row['shares'] || row['No. of shares'] || 0).replace(',', '.'));
 
     return {
-      id: (row['ID'] || row['id'] || Date.now().toString() + Math.random().toString().slice(2, 8)),
-      name: row['Name'] || row['name'] || 'Ativo Desconhecido',
-      ticker: row['Ticker'] || row['ticker'] || '',
-      isin: row['ISIN'] || row['isin'] || '',
+      id: String(row['id'] || row['ID'] || Date.now().toString() + Math.random().toString().slice(2, 8)),
+      name: row['name'] || row['Name'] || 'Ativo Desconhecido',
+      ticker: String(row['ticker'] || row['Ticker'] || ''),
+      isin: String(row['isin'] || row['ISIN'] || ''),
       type: action,
       date: dateStr,
       pricePerShare: price,
       investedValue: Math.abs(total),
-      shares: shares,
-      notes: row['Notes'] || ''
+      shares: sharesCount,
+      notes: row['notes'] || row['Notes'] || ''
     };
   });
 };
 
 export const exportInvestmentsToExcel = (investments: Investment[]) => {
-  const ws = XLSX.utils.json_to_sheet(investments);
+  const ws = investments.length > 0 
+    ? XLSX.utils.json_to_sheet(investments, { header: INVESTMENT_HEADERS })
+    : XLSX.utils.aoa_to_sheet([INVESTMENT_HEADERS]);
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Investimentos");
   XLSX.writeFile(wb, "investimentos_fingestor.xlsx");

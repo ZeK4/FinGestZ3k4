@@ -4,6 +4,17 @@ export type InvestmentAction = 'Market buy' | 'Market sell' | 'Dividend' | 'Depo
 export type ChartType = 'pie' | 'bar';
 export type Language = 'pt' | 'en';
 export type ThemeMode = 'light' | 'dark' | 'auto';
+export type AlertType = 'salary' | 'investment' | 'other';
+
+export interface RecurringAlert {
+  id: string;
+  title: string;
+  type: AlertType;
+  dayOfMonth: number;
+  amount?: number;
+  active: boolean;
+  autoRecord: boolean; // Se deve tentar registar automaticamente ou apenas avisar
+}
 
 export interface Transaction {
   id: string;
@@ -45,6 +56,7 @@ export interface AppConfig {
   dashboardChartType: ChartType;
   showInvestmentCharts: boolean;
   investmentChartType: ChartType;
+  alerts: RecurringAlert[];
 }
 
 export const DEFAULT_CATEGORIES = [

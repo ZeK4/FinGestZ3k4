@@ -6,9 +6,9 @@ import Dashboard from './pages/Dashboard';
 import Investments from './pages/Investments';
 import Goals from './pages/Goals';
 import Settings from './pages/Settings';
-import { Transaction, Investment, Goal, AppConfig } from './types';
+import { Transaction, Investment, Goal, AppConfig, RecurringAlert } from './types';
 import { translations, t } from './i18n';
-import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import { X, CheckCircle, AlertCircle, Info, Calendar } from 'lucide-react';
 
 interface Notification {
   id: string;
@@ -44,7 +44,8 @@ const App: React.FC = () => {
       showDashboardCharts: true,
       dashboardChartType: 'pie',
       showInvestmentCharts: true,
-      investmentChartType: 'pie'
+      investmentChartType: 'pie',
+      alerts: []
     };
   });
 
@@ -80,6 +81,18 @@ const App: React.FC = () => {
       applyTheme(config.theme);
     }
   }, [config.theme]);
+
+  // Check for Alerts of the day
+  useEffect(() => {
+    if (config.alerts && config.alerts.length > 0) {
+      const today = new Date().getDate();
+      const todaysAlerts = config.alerts.filter(a => a.dayOfMonth === today && a.active);
+      
+      todaysAlerts.forEach(alert => {
+        addNotification(`${t('alerts', config.language)}: ${alert.title}`, 'info');
+      });
+    }
+  }, [config.alerts, config.language]);
 
   useEffect(() => { localStorage.setItem('transactions', JSON.stringify(transactions)); }, [transactions]);
   useEffect(() => { localStorage.setItem('investments', JSON.stringify(investments)); }, [investments]);
@@ -220,7 +233,7 @@ const App: React.FC = () => {
                   <p className="text-sm text-slate-500 dark:text-slate-400">{t('manageFinances', config.language)}</p>
                </div>
                <div className="hidden md:block text-xs bg-slate-200 dark:bg-slate-800 px-3 py-1 rounded-full text-slate-600 dark:text-slate-400">
-                  v1.4.0 International
+                  v1.5.0 Scheduler
                </div>
             </div>
 
@@ -248,6 +261,7 @@ const App: React.FC = () => {
                   showCharts={config.showInvestmentCharts}
                   chartType={config.investmentChartType}
                   lang={config.language}
+                  notify={addNotification}
                 />
               } />
               <Route path="/goals" element={

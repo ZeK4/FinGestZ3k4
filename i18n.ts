@@ -63,7 +63,22 @@ export const translations = {
     deposit: "Depósito",
     withdrawal: "Levantamento",
     interest: "Juros",
-    others: "Outros"
+    others: "Outros",
+    alerts: "Alertas e Notificações",
+    recurringTasks: "Tarefas Recorrentes",
+    addAlert: "Adicionar Alerta",
+    alertType: "Tipo de Alerta",
+    salaryDay: "Dia de Recebimento (Ordenado)",
+    investmentDay: "Dia de Investimento",
+    other: "Outro / Geral",
+    dayOfMonth: "Dia do Mês",
+    autoRecord: "Registo Automático",
+    activeAlerts: "Alertas Ativos",
+    noAlerts: "Nenhum alerta configurado.",
+    confirmDelete: "Tens a certeza que desejas eliminar?",
+    alertCreated: "Alerta criado com sucesso!",
+    errorInvestmentFileInDash: "Ficheiro de investimentos detetado! Por favor, importe-o no menu 'Investimentos'.",
+    errorTransactionFileInInv: "Ficheiro de transações detetado! Por favor, importe-o no 'Dashboard'."
   },
   en: {
     dashboard: "Dashboard",
@@ -126,7 +141,22 @@ export const translations = {
     deposit: "Deposit",
     withdrawal: "Withdrawal",
     interest: "Interest",
-    others: "Others"
+    others: "Others",
+    alerts: "Alerts & Notifications",
+    recurringTasks: "Recurring Tasks",
+    addAlert: "Add Alert",
+    alertType: "Alert Type",
+    salaryDay: "Payday (Salary)",
+    investmentDay: "Investment Day",
+    other: "Other / General",
+    dayOfMonth: "Day of Month",
+    autoRecord: "Auto Record",
+    activeAlerts: "Active Alerts",
+    noAlerts: "No alerts configured.",
+    confirmDelete: "Are you sure you want to delete?",
+    alertCreated: "Alert created successfully!",
+    errorInvestmentFileInDash: "Investment file detected! Please import it in the 'Investments' menu.",
+    errorTransactionFileInInv: "Transaction file detected! Please import it in the 'Dashboard'."
   }
 };
 

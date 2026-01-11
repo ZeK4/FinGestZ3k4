@@ -85,7 +85,9 @@ const Dashboard: React.FC<DashboardProps> = ({
         onImportTransactions(imported);
       }
     } catch (error: any) {
-      notify(error.message || "Error", "error");
+      // Tenta traduzir a mensagem de erro se for uma chave conhecida (como erro de estrutura)
+      const msg = t(error.message as any, lang);
+      notify(msg, "error");
     } finally {
       setIsImporting(false);
       e.target.value = '';
